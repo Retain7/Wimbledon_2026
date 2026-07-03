@@ -1,29 +1,3 @@
-
-"""
-wimbledon_rf.py
----------------
-Trains a Random Forest on ATP grass match history and simulates Wimbledon 2026.
-
-Training approach:
-  - Every historical grass match becomes a training row.
-  - All per-match features are computed from each player's history UP TO BUT
-    NOT INCLUDING that match (no data leakage).
-  - Player profiles (player_profiles.csv) are used only at simulation time.
-
-Updated features vs prior version:
-  - wimb_formula_diff      Replaced grass ELO with the classic Wimbledon seeding formula proxy
-  - grass_serve_quality    Fraction of serve points won strictly on grass (career rolling avg)
-  - Dropped raw p1/p2 rank to prevent collinearity with rank_diff
-  - Removed recent_win_rate to eliminate clay season contamination
-
-Prerequisites:
-    1. Run fetch_data.py first — populates ./data/
-    2. wimbledon_2026_draw.json must be in ./data/
-
-Usage:
-    python wimbledon_rf.py
-"""
-
 import os
 import json
 import random
@@ -39,14 +13,16 @@ from sklearn.model_selection import GroupKFold
 
 warnings.filterwarnings("ignore")
 
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
+
+
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 data_dir = os.path.join(script_dir, "data")
 matches_path = os.path.join(data_dir, "atp_matches_all.csv")
 profiles_path = os.path.join(data_dir, "player_profiles.csv")
 draw_path = os.path.join(data_dir, "wimbledon_2026_draw.json")
+
+
 
 FEATURES = [
     # Ranking
@@ -76,6 +52,8 @@ FEATURES = [
     "p2_second_serve_won_pct",
 ]
 
+
+# Random forest parameters
 RF_PARAMS = dict(
     n_estimators=1000,
     max_depth=15,
@@ -88,7 +66,6 @@ RF_PARAMS = dict(
 
 
 def log_rank_diff(r1, r2):
-    """Log-ratio rank gap: log(r1) - log(r2)."""
     return np.log(r1) - np.log(r2)
 
 
@@ -97,8 +74,6 @@ def normalise(name):
 
 
 class Player_Stats:
-    """Centralizes rolling player statistics and feature generation."""
-
     def __init__(self):
         self.grass_w = defaultdict(int)
         self.grass_t = defaultdict(int)
