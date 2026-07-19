@@ -1,55 +1,103 @@
-# Random Forest Model for Wimbledon Gentlemen's Singles, 2026
+# Wimbledon 2026 — Random Forest Win Probability Model
 
-## Goal:
-My overall goal with this was to predict the winner of Wimbledon's gentlemen's singles tournament via a random forest model.
+Predicts the winner of the 2026 Wimbledon gentlemen's singles draw with a random forest trained on ATP match data (2015–2026), then simulates the tournament 50,000 times to get a per-player championship probability.
 
-## Model Type:
-I chose a random forest instead of a regression or neural network model for the following reasons.
+**Result:** 5-fold cross-validated Brier score of **0.2022 ± 0.0026** (accuracy 67.8%) on 3,311 grass-court matches, using a leakage-free feature pipeline and match-grouped CV.
 
-### Regressions:
-Regressions assume linearity, no multicollinearity, independence of observations, homoscedasticity of residuals, and a normal distribution for residuals. The ones we'll look at will be linearity, no multicollinearity, and independence of observations.
-- Linearity: The random forest is superior because certain features simply aren't linear. For example, the 'ace_rate' importance plateaus, because the difference between a bad serve and a good serve is not the same as a good serve to a great serve. Along the same lines, features like 'grass_serve_quality', 'wimb_formula_dff', 'peak_rank', and some other features fail to be linear.
-- No multicollinearity: Necesarrily, there will be multicollinearity. All features related to winning, like 'grass_win_rate', 'ytd_win_rate', and 'top10_win_rate' will be __, and in a similat vein, so will all the features related to serving. Because of this, a regression would fail with these correlated features.
-- Independence of observations: A given match isn't independent from all other matches. Player's momentum or fatigue in a given tournament mean that the matches prior affect the next ones, meaning that every match can actually be thought of as dependent on the prior one, to an extent. Because of this, we can't assume independence of observations.
+## Data
 
-### Neural Networks:
-Neural networks, though very powerful, have requirements and tradeoffs which aren't practical with predicting a tennis tournamet outcome. A neural network would require significant data and many more grass matches than actually exist, as grass is the shortest season for the ATP. Furthermore, all interpretability would be lost, meaning  it would be much harder to see if the model would be overfitting or not. 
+- ATP match-level data 2015–2026 (via [tennisabstract.com](https://tennisabstract.com)), 32,237 matches total.
+- Each match contributes two rows (winner-perspective, loser-perspective), giving 6,622 training rows.
+- Features for a given match are built from `Player_Stats` state before `update_after_match` is called on that match, thereby ensuring no lookahead leakage from the match being predicted.
 
-### Random Forests:
-Because of the clear limitations of regressions and neural networks, the random forest model would allow for non-linearity and multicorrelation while still being semi-interpretable. The parameter choices were as follows:
-- 'n_estimators = 1000': By increasing the total number of decision trees, the variance of ___ decreases.
-- 'max_depth = 15': With 11 features, more decisions need to be made, and so greater depth is enabled to pick up any deeper relationships.
-- 'min_samples_leaf = 25': By forcing 25 historical samples to exist for a given decision, this works to regulate the 'max_depth' by ensuring there is backing behind every decision.
-- 'criterion = "log_loss"': By using "log_loss" as opposed to "gini" or other criterion, the model penalizes extremes and overconfidence, thereby allowing for ___. 
+## Model choice: why random forest
 
-## Features:
-As an avid tennis fan, I decided to look at both the basic features, and some more nuanced ones as well. The features I chose incldue:
-- 'rank_diff'
-  - This is calculated via the log difference between ranks, because the difference from 1 to 50 is very different than 50 to 100 w.r.t. ranking.
-- 'peak_rank'
-- 'grass_win_rate'
-  - ??
-- 'peak_wimb_rate'
-  - The best a player has ever done at Wimbledon.
-- 'ytd_win_rate'
-- 'top10_win_rate'
-  - Player's who do better against the top 10 tend to have greater odds of upsets / going deep.
-- 'ace_rate'
-- 'first_serve_pct'
-- 'second_serve_won_pct'
-- 'grass_serve_quality'
-  - Right now this only shows serve quality by taking the % of points won on serve. However, I look to add a speed metric to it, because speed is very important on the fast grass surface.
-- 'wimb_formula_diff'
-  - Wimbledon used to employ a formula to seed players using both ATP ranking and their own developed "grass ranking." Now it has been removed, but through this we can see whether it was valuable or not.
+Three properties of tennis-match data rule out a plain logistic regression and make a neural network impractical, while a random forest handles both:
 
-## Output:
-???
+- **Non-linearity.** Several features have diminishing or plateauing effects rather than linear ones — e.g. the gap between a bad serve and a good serve matters more than the gap between a good serve and a great one. `ace_rate`, `grass_serve_quality`, and `peak_rank` all show this pattern.
+- **Multicollinearity.** The win-rate features (`grass_win_rate`, `ytd_win_rate`, `top10_win_rate`, `peak_wimb_rate`) and the serve features (`grass_serve_quality`, `ace_rate`, `second_serve_won_pct`) are correlated by construction (r = 0.5–0.7 between related pairs; `rank_diff` and `wimb_formula_diff` are r = -0.83). A regression's coefficients would be unstable under this; a tree ensemble is unaffected.
+- **Non-independence of observations.** A player's form and fatigue carry from match to match within a tournament, so the assumption behind standard regression inference doesn't hold cleanly here either.
 
-## Limitations:
-One of the bigger limitations I faced was in the data. Ideally, having data around the average speeds of forehands / backhands, the width / depth of serve, and spatial data like if points were won from the baseline or from dropshots would have helped immensely, I believe. That being said, such granular data is currently being generated, but will take time in order to have it ready for a tournament before the tournament starts. Some other limitations faced include ???
+A neural network would in principle handle the non-linearity too, but grass is the shortest ATP season by a wide margin (~10% of tour matches), so the effective sample size is too small to train one without overfitting, and it would sacrifice the interpretability that matters for sanity-checking a sports model.
 
-## Going Forward:
-???
+### Hyperparameters
 
-## Last Note:
-Thank you to tennisabstract.com for generating the data I used for the majority of this project.
+| Parameter | Value | Rationale |
+|---|---|---|
+| `n_estimators` | 1000 | More trees reduce the variance of the ensemble's averaged class-probability estimate. |
+| `max_depth` | 15 | 19 features with paired (p1/p2) structure need enough depth to capture interaction effects between them. |
+| `min_samples_leaf` | 25 | Regularizes against `max_depth=15` by requiring  historical support behind every split — important given the training set is only ~3,300 matches. |
+| `criterion` | `log_loss` | Penalizes confident wrong predictions more than Gini does, which matters because the output used downstream is the probability itself, not just the argmax class. |
+
+## Features
+
+| Feature | Description |
+|---|---|
+| `rank_diff` | Log-difference of ATP rank (1→50 is not equivalent to 50→100, so raw rank difference would be misleading). |
+| `peak_rank` | Player's best-ever ATP ranking. |
+| `grass_win_rate` | Career win rate restricted to grass-court matches. |
+| `peak_wimb_rate` | Best single-year win rate the player has posted at Wimbledon itself. |
+| `ytd_win_rate` | Win rate in the current season, as a form signal. |
+| `top10_win_rate` | Win rate specifically against top-10 opponents — a proxy for upset/deep-run potential. |
+| `ace_rate`, `first_serve_pct`, `second_serve_won_pct` | Grass-restricted serve statistics. |
+| `grass_serve_quality` | % of service points won, grass-restricted. Currently doesn't account for serve speed. |
+| `wimb_formula_diff` | Proxy for Wimbledon's former seeding formula (ATP rank blended with a grass-specific rating), reconstructed from rolling grass results to test whether it would still carry predictive value if reinstated. |
+
+## Results
+
+**5-fold GroupKFold cross-validation** (folds split on `match_id`, so a match's winner-row and loser-row never land in different folds):
+
+- Brier score: **0.2022 ± 0.0026**
+- Accuracy: **67.8%**
+
+**Feature importance** (p1/p2 pairs combined):
+
+| Feature | Importance |
+|---|---|
+| `wimb_formula_diff` | 0.207 |
+| `rank_diff` | 0.140 |
+| `peak_rank` | 0.107 |
+| `ytd_win_rate` | 0.082 |
+| `ace_rate` | 0.074 |
+| `grass_serve_quality` | 0.073 |
+| `peak_wimb_rate` | 0.072 |
+| `grass_win_rate` | 0.070 |
+| `top10_win_rate` | 0.067 |
+| `second_serve_won_pct` | 0.054 |
+| `first_serve_pct` | 0.054 |
+
+The reconstructed Wimbledon seeding formula and log rank-difference are the two strongest signals by a clear margin — a reasonable result, since both are themselves aggregations of a player's grass-specific track record.
+
+**2026 championship probabilities** (50,000 tournament simulations from the actual draw, pre-tournament):
+
+| Player | Win probability |
+|---|---|
+| Sinner | 30.1% |
+| Zverev | 9.0% |
+| Auger-Aliassime | 8.1% |
+| Djokovic | 7.0% |
+| Shelton | 6.6% |
+| Fritz | 4.4% |
+| De Minaur | 3.8% |
+| *(remaining field ≥1%)* | — |
+
+## Limitations
+
+- **Grass-only training set is small.** Restricting to `is_grass` matches leaves 3,311 matches out of 32,237 logged (10.4%) — grass has the shortest ATP season of any surface. This is the main reason imputation (feature medians) is doing real work for players with thin grass history, and it's why `min_samples_leaf=25` is set as high as it is relative to the depth.
+- **No time-decay on historical rates.** `grass_win_rate`, `top10_win_rate`, etc. are unweighted career rates — a win from 2015 counts identically to one from last month, despite tennis form and injury cycles moving faster than that.
+- **Static, not conditional, simulation.** `simulate_tournament` uses the same pre-tournament `win_prob` for every round of the bracket, including the final. It doesn't re-condition on actual round results (an early upset is new information the model currently never sees).
+- **Uncalibrated probabilities.** Random forests are known to compress probabilities toward 0.5 relative to true frequencies, particularly with a smoothing parameter like `min_samples_leaf=25`. No calibration layer (Platt/isotonic) or reliability check has been applied yet, so these probabilities are better trusted as a *ranking* of players than as literal frequencies.
+- **Missing shot-level data.** Granular data — serve speed, rally shot placement, forehand/backhand pace — isn't available yet at the resolution needed for this project, but is being generated for future versions.
+- **Random-fold rather than time-respecting validation.** GroupKFold prevents leakage within a match but still shuffles matches across years into folds, so the CV score can be modestly optimistic relative to a true walk-forward (train on past years only, test on the next) evaluation.
+
+## Going forward
+
+- Add probability calibration (`CalibratedClassifierCV`, isotonic) and report a reliability diagram before/after.
+- Add a walk-forward validation report (train ≤ year Y, test year Y+1) alongside the GroupKFold number.
+- Add a logistic regression baseline and a gradient-boosted tree (XGBoost/LightGBM) comparison to substantiate the random forest choice with evidence rather than assertion.
+- Re-run inference round-by-round during the actual tournament instead of relying on a single pre-tournament snapshot.
+- Compare the model's implied probabilities against prediction-market (Kalshi) or de-vigged sportsbook odds to check whether the model has real edge, measured on Brier score rather than P&L alone.
+
+## Acknowledgments
+
+Data generated by [tennisabstract.com](https://tennisabstract.com).
