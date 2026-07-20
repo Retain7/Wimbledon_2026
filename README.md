@@ -18,7 +18,7 @@ Three properties of tennis-match data rule out a plain logistic regression and m
 - **Multicollinearity.** The win-rate features (`grass_win_rate`, `ytd_win_rate`, `top10_win_rate`, `peak_wimb_rate`) and the serve features (`grass_serve_quality`, `ace_rate`, `second_serve_won_pct`) are correlated by construction (r = 0.5–0.7 between related pairs; `rank_diff` and `wimb_formula_diff` are r = -0.83). A regression's coefficients would be unstable under this; a tree ensemble is unaffected.
 - **Non-independence of observations.** A player's form and fatigue carry from match to match within a tournament, so the assumption behind standard regression inference doesn't hold cleanly here either.
 
-A neural network would in principle handle the non-linearity too, but grass is the shortest ATP season by a wide margin (~10% of tour matches), so the effective sample size is too small to train one without overfitting, and it would sacrifice the interpretability that matters for sanity-checking a sports model.
+A neural network would in principle handle the non-linearity too, but grass is the shortest ATP season by a wide margin (~10% of tour matches), so the effective sample size on the grass-specific features is too small to train without overfitting, and it would sacrifice the interpretability of the model.
 
 ### Hyperparameters
 
@@ -26,7 +26,7 @@ A neural network would in principle handle the non-linearity too, but grass is t
 |---|---|---|
 | `n_estimators` | 1000 | More trees reduce the variance of the ensemble's averaged class-probability estimate. |
 | `max_depth` | 15 | 19 features with paired (p1/p2) structure need enough depth to capture interaction effects between them. |
-| `min_samples_leaf` | 25 | Regularizes against `max_depth=15` by requiring  historical support behind every split — important given the training set is only ~3,300 matches. |
+| `min_samples_leaf` | 25 | Regularizes against `max_depth=15` by requiring  historical support behind every split. |
 | `criterion` | `log_loss` | Penalizes confident wrong predictions more than Gini does, which matters because the output used downstream is the probability itself, not just the argmax class. |
 
 ## Features
@@ -39,7 +39,7 @@ A neural network would in principle handle the non-linearity too, but grass is t
 | `peak_wimb_rate` | Best single-year win rate the player has posted at Wimbledon itself. |
 | `ytd_win_rate` | Win rate in the current season, as a form signal. |
 | `top10_win_rate` | Win rate specifically against top-10 opponents — a proxy for upset/deep-run potential. |
-| `ace_rate`, `first_serve_pct`, `second_serve_won_pct` | Grass-restricted serve statistics. |
+| `ace_rate`, `first_serve_pct`, `second_serve_won_pct` | Serve statistics. |
 | `grass_serve_quality` | % of service points won, grass-restricted. Currently doesn't account for serve speed. |
 | `wimb_formula_diff` | Proxy for Wimbledon's former seeding formula (ATP rank blended with a grass-specific rating), reconstructed from rolling grass results to test whether it would still carry predictive value if reinstated. |
 
@@ -83,10 +83,9 @@ The reconstructed Wimbledon seeding formula and log rank-difference are the two 
 
 ## Limitations
 
-- **Grass-only training set is small.** Restricting to `is_grass` matches leaves 3,311 matches out of 32,237 logged (10.4%) — grass has the shortest ATP season of any surface. This is the main reason imputation (feature medians) is doing real work for players with thin grass history, and it's why `min_samples_leaf=25` is set as high as it is relative to the depth.
 - **No time-decay on historical rates.** `grass_win_rate`, `top10_win_rate`, etc. are unweighted career rates — a win from 2015 counts identically to one from last month, despite tennis form and injury cycles moving faster than that.
 - **Static, not conditional, simulation.** `simulate_tournament` uses the same pre-tournament `win_prob` for every round of the bracket, including the final. It doesn't re-condition on actual round results (an early upset is new information the model currently never sees).
-- **Uncalibrated probabilities.** Random forests are known to compress probabilities toward 0.5 relative to true frequencies, particularly with a smoothing parameter like `min_samples_leaf=25`. No calibration layer (Platt/isotonic) or reliability check has been applied yet, so these probabilities are better trusted as a *ranking* of players than as literal frequencies.
+- **Uncalibrated probabilities.** Random forests are known to compress probabilities toward 0.5 relative to true frequencies, particularly with a smoothing parameter like `min_samples_leaf=25`. No calibration layer or reliability check has been applied yet, so these probabilities are better trusted as a *ranking* of players than as literal frequencies.
 - **Missing shot-level data.** Granular data — serve speed, rally shot placement, forehand/backhand pace — isn't available yet at the resolution needed for this project, but is being generated for future versions.
 - **Random-fold rather than time-respecting validation.** GroupKFold prevents leakage within a match but still shuffles matches across years into folds, so the CV score can be modestly optimistic relative to a true walk-forward (train on past years only, test on the next) evaluation.
 
