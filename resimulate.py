@@ -15,18 +15,9 @@ the exact "name" strings from wimbledon_2026_draw.json:
 
 DESIGN
 ------
-Layer A (every call, essentially free): the bracket is collapsed to
-reflect real results. Eliminated players are dropped entirely; only
-survivors are resimulated forward. The fitted model is untouched.
-
-Layer B (once per round, after ALL of that round's matches are in):
-each surviving player's grass_win_rate is nudged toward their
-Wimbledon-2026 performance so far, blended with their career grass
-rate. The blend weight grows round-over-round (BLEND_SCHEDULE) — a
-single extra match shouldn't overwrite years of history, but by the
-semis it should matter more. This is intentionally NOT a retrain:
-refitting a 1000-tree forest on a handful of new rows would overfit
-badly, so only the *inputs* to the already-fitted model move.
+The bracket is collapsed to reflect real results. Eliminated players
+are dropped entirely; only survivors are resimulated forward. The
+fitted model is untouched.
 
 State (which players are eliminated, what's been fed in so far) is
 persisted in data/tournament_state.json so you can run this once per
@@ -49,19 +40,6 @@ from wimbledon_rf import (
 
 STATE_PATH = os.path.join(data_dir, "tournament_state.json")
 
-# Weight given to in-tournament form vs. career history, applied once a
-# round is fully complete. R1 barely moves the needle; by the SF/F the
-# live signal is weighted much more heavily.
-BLEND_SCHEDULE = {
-    1: 0.05,
-    2: 0.10,
-    3: 0.15,
-    4: 0.20,  # Round of 16
-    5: 0.30,  # QF
-    6: 0.40,  # SF
-    7: 0.40,  # F
-}
-
 
 def load_state():
     if os.path.exists(STATE_PATH):
@@ -81,32 +59,6 @@ def apply_round_results(state, results, round_num):
         state["match_log"].append({"round": round_num, **r})
     state["completed_rounds"] = max(state["completed_rounds"], round_num)
     return state
-
-
-def blend_in_tournament_form(player_stats, state, prof_idx):
-    """Layer B: nudge grass_win_rate toward Wimbledon-2026-so-far form."""
-    weight = BLEND_SCHEDULE.get(state["completed_rounds"], 0.0)
-    if weight == 0:
-        return player_stats
-
-    wins, losses = Counter(), Counter()
-    for m in state["match_log"]:
-        wins[normalise(prof_idx.loc[m["winner"], "sackmann_name"])] += 1
-        losses[normalise(prof_idx.loc[m["loser"], "sackmann_name"])] += 1
-
-    for player in set(list(wins) + list(losses)):
-        played = wins[player] + losses[player]
-        if played == 0:
-            continue
-        live_rate = wins[player] / played
-        n = player_stats.grass_t[player]
-        if n == 0:
-            continue
-        prior_rate = player_stats.grass_w[player] / n
-        blended_rate = (1 - weight) * prior_rate + weight * live_rate
-        # keep the original sample size, just shift the implied rate
-        player_stats.grass_w[player] = blended_rate * n
-    return player_stats
 
 
 def main():
@@ -131,12 +83,10 @@ def main():
     train_df = pd.DataFrame(training_rows)
     model, feature_medians = train_model(train_df)
 
-    player_stats = blend_in_tournament_form(player_stats, state, prof_idx)
-
     with open(draw_path) as f:
         full_draw = json.load(f)
 
-    # Layer A: collapse the bracket to survivors only. Original draw order
+    # Collapse the bracket to survivors only. Original draw order
     # already encodes bracket structure, so filtering preserves correct
     # pairings for whatever rounds remain.
     eliminated = set(state["eliminated"])
