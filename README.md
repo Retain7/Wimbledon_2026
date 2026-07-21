@@ -105,6 +105,18 @@ Because cross-validation only checks the model against itself, for trading it's 
 
 This matters more than the cross-validation testing because beating the market allows for profit to be made. An important caveat that will need to be included in future projects is beating both the market and the fee, and prediction markets run by Kalshi and Polymarket have fees that could render trades unprofitable.
 
+### Backtest results (2018, 2019, 2021–2025 Wimbledons)
+
+| | Log-loss |
+|---|---|
+| Model | 0.5727 |
+| Market (devigged) | 0.5263 |
+| **Gap** | Market beats model by **0.0464** |
+
+Evaluated on 727 Wimbledon matches with odds coverage across the seven backtest years.
+
+The market wins, which is the expected and honest result — professional odds compilers have access to injury reports, practice-court observation, and same-day information no static feature set captures. The useful number here isn't "did I beat the market" but the size of the gap: 0.0464 in log-loss is close enough to suggest the model is picking up a real, if smaller, share of the same signal the market prices in, rather than being off by an order of magnitude. Whether that residual gap is close enough to justify looking for +EV spots (rather than the model just tracking the market with a lag) is exactly what a round-by-round or seed-tier breakdown, listed under Going Forward, would help establish.
+
 ## Live tournament updating (`resimulate.py`)
 
 
@@ -124,6 +136,7 @@ State (who's eliminated, match log so far) is persisted to `data/tournament_stat
 - Adding probability calibration and report a reliability diagram before/after.
 - Adding a logistic regression baseline and a gradient-boosted tree (XGBoost/LightGBM) comparison to substantiate the random forest choice with evidence rather than assertion.
 - Extending `resimulate.py` into an actual trading signal against Kalshi and/or sportsbook markets, sizing positions off the model-vs-market edge rather than just reporting probabilities. From this, I'd want to see which trades succeed and fail, and train a model based off that new knowledge.
+- Breaking the backtest down by round and by seed-tier (favorite vs. underdog matches) to see whether the model's 0.046 log-loss gap to market is concentrated in specific spots (e.g., unseeded/qualifier upsets) rather than spread evenly — that would be a much stronger case for a trading edge than the aggregate number alone.
 
 ## Acknowledgments
 
