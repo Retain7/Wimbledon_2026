@@ -2,7 +2,7 @@
 
 This project predicts the winner of the 2026 Wimbledon gentlemen's singles draw with a random forest trained on ATP match data (2015–2026). These predictions are validated against both internal cross-validation and external devigged betting market odds. The tournament is simulated two ways: a pre-tournament Monte Carlo simulation (50,000 runs from the actual draw) in `wimbledon_rf.py`, and a live resimulation that shrinks the bracket to winners as actual results are announced, in `resimulate.py`.
 
-**Result:** 5-fold cross-validated Brier score of **0.2022 ± 0.0026** (accuracy 67.8%), evaluated on 3,311 grass-court matches, using a leakage-free feature pipeline and match-grouped CV.
+**Result:** 5-fold cross-validated Brier score of **0.1590 ± 0.0079** (accuracy 75.9%), evaluated on ___ Wimbledon matches, using a leakage-free feature pipeline and match-grouped CV.
 
 ## Project structure
 
@@ -57,24 +57,24 @@ A neural network would in principle handle the non-linearity too, but grass is t
 
 **5-fold GroupKFold cross-validation**, evaluated on the grass-court subset since that's the closest proxy to Wimbledon conditions (folds split on `match_id`, so a match's winner-row and loser-row never land in different folds). 5-fold was chosen to balance between compute cost and bias. The output of the model was as follows:
 
-- Brier score: **0.2022 ± 0.0026**
-- Accuracy: **67.8%**
+- Brier score: **0.1590 ± 0.0079**
+- Accuracy: **75.9%**
 
 **Feature importance** (p1/p2 pairs combined):
 
 | Feature | Importance |
 |---|---|
-| `wimb_formula_diff` | 0.207 |
-| `rank_diff` | 0.140 |
-| `peak_rank` | 0.107 |
-| `ytd_win_rate` | 0.082 |
-| `ace_rate` | 0.074 |
-| `grass_serve_quality` | 0.073 |
-| `peak_wimb_rate` | 0.072 |
-| `grass_win_rate` | 0.070 |
-| `top10_win_rate` | 0.067 |
-| `second_serve_won_pct` | 0.054 |
-| `first_serve_pct` | 0.054 |
+| `rank_diff` | 0.233 |
+| `wimb_formula_diff` | 0.169 |
+| `peak_rank` | 0.122 |
+| `ytd_win_rate` | 0.105 |
+| `top10_win_rate` | 0.082 |
+| `grass_serve_quality` | 0.058 |
+| `ace_rate` | 0.054 |
+| `second_serve_won_pct` | 0.053 |
+| `grass_win_rate` | 0.052 |
+| `first_serve_pct` | 0.051 |
+| `peak_wimb_rate` | 0.020 |
 
 The reconstructed Wimbledon seeding formula and log rank-difference are the two strongest signals by a clear margin — a reasonable result, since both are themselves aggregations of a player's grass-specific track record.
 
@@ -82,13 +82,17 @@ The reconstructed Wimbledon seeding formula and log rank-difference are the two 
 
 | Player | Win probability |
 |---|---|
-| Sinner | 30.1% |
-| Zverev | 9.0% |
-| Auger-Aliassime | 8.1% |
-| Djokovic | 7.0% |
-| Shelton | 6.6% |
-| Fritz | 4.4% |
+| Sinner | 50.6% |
+| Djokovic | 9.3% |
+| Zverev | 8.8% |
+| Auger-Aliassime | 4.3% |
 | De Minaur | 3.8% |
+| Shelton | 3.4% |
+| Fritz | 2.9% |
+| Medvedev | 2.2% |
+| Bublik | 1.3% |
+| Cobboli | 1.2% |
+| Lehecka | 1.1% |
 | *(remaining field ≥1%)* | — |
 
 ## Validating against the market (`odds_backtest.py`)
@@ -100,6 +104,18 @@ Because cross-validation only checks the model against itself, for trading it's 
 - Both the model and the market are scored with log-loss, and the two scores are compared directly.
 
 This matters more than the cross-validation testing because beating the market allows for profit to be made. An important caveat that will need to be included in future projects is beating both the market and the fee, and prediction markets run by Kalshi and Polymarket have fees that could render trades unprofitable.
+
+### Backtest results (2018, 2019, 2021–2025 Wimbledons)
+
+| | Log-loss |
+|---|---|
+| Model | 0.5727 |
+| Market (devigged) | 0.5263 |
+| **Gap** | Market beats model by **0.0464** |
+
+Evaluated on 727 Wimbledon matches with odds coverage across the seven backtest years.
+
+The market wins, which is the expected and honest result — professional odds compilers have access to injury reports, practice-court observation, and same-day information no static feature set captures. The useful number here isn't "did I beat the market" but the size of the gap: 0.0464 in log-loss is close enough to suggest the model is picking up a real, if smaller, share of the same signal the market prices in, rather than being off by an order of magnitude. Whether that residual gap is close enough to justify looking for +EV spots (rather than the model just tracking the market with a lag) is exactly what a round-by-round or seed-tier breakdown, listed under Going Forward, would help establish.
 
 ## Live tournament updating (`resimulate.py`)
 
@@ -120,6 +136,7 @@ State (who's eliminated, match log so far) is persisted to `data/tournament_stat
 - Adding probability calibration and report a reliability diagram before/after.
 - Adding a logistic regression baseline and a gradient-boosted tree (XGBoost/LightGBM) comparison to substantiate the random forest choice with evidence rather than assertion.
 - Extending `resimulate.py` into an actual trading signal against Kalshi and/or sportsbook markets, sizing positions off the model-vs-market edge rather than just reporting probabilities. From this, I'd want to see which trades succeed and fail, and train a model based off that new knowledge.
+- Breaking the backtest down by round and by seed-tier (favorite vs. underdog matches) to see whether the model's 0.046 log-loss gap to market is concentrated in specific spots (e.g., unseeded/qualifier upsets) rather than spread evenly — that would be a much stronger case for a trading edge than the aggregate number alone.
 
 ## Acknowledgments
 
