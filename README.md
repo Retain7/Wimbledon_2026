@@ -24,7 +24,7 @@ This project predicts the winner of the 2026 Wimbledon gentlemen's singles draw 
 Three properties of tennis-match data rule out a plain logistic regression and make a neural network impractical, while a random forest handles both:
 
 - **Non-linearity.** Several features have diminishing or plateauing effects rather than linear ones; for example, the gap between a bad serve and a good serve matters more than the gap between a good serve and a great one. `ace_rate`, `grass_serve_quality`, and `peak_rank` all show this pattern.
-- **Multicollinearity.** The win-rate features (`grass_win_rate`, `ytd_win_rate`, `top10_win_rate`, `peak_wimb_rate`) and the serve features (`grass_serve_quality`, `ace_rate`, `second_serve_won_pct`) are correlated by construction (r = 0.5–0.7 between related pairs; `rank_diff` and `wimb_formula_diff` are r = -0.83). A regression's coefficients would be unstable under this; a tree ensemble is unaffected. (Claude, I need you to use the image and talk about it in this bullet about multicollinearity)
+- **Multicollinearity.** The win-rate features (`grass_win_rate`, `ytd_win_rate`, `top10_win_rate`, `peak_wimb_rate`) and the serve features (`grass_serve_quality`, `ace_rate`, `second_serve_won_pct`) are correlated by construction (r = 0.5–0.7 between related pairs; `rank_diff` and `wimb_formula_diff` are r = -0.83). A regression's coefficients would be unstable under this; a tree ensemble is unaffected.
 ![Correlation heatmap for features](./correlation_heatmap.png)
 - **Non-independence of observations.** A player's form and fatigue carry from match to match within a tournament, so the assumption behind standard regression inference doesn't hold cleanly here either.
 
