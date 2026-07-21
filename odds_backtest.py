@@ -19,6 +19,24 @@ from wimbledon_rf import Player_Stats, load_matches, build_training_rows, train_
 ODDS_DIR = os.path.join(data_dir, "odds")
 
 
+def canon_key(name):
+    """
+    Canonicalize a player name to 'lastname firstinitial', reconciling
+    tennis-data.co.uk's 'Federer R.' style with Sackmann's full-name
+    'Roger Federer' style. Assumes both inputs are already lowercased
+    (call after normalise()), or handles raw strings directly.
+    """
+    s = str(name).strip().lower().replace(".", "")
+    parts = s.split()
+    if len(parts) < 2:
+        return s
+    if len(parts[-1]) == 1:
+        # already "lastname f" shape (tennis-data)
+        return s
+    # "firstname lastname" -> "lastname f" (Sackmann)
+    return f"{parts[-1]} {parts[0][0]}"
+
+
 def load_wimbledon_odds(years):
     frames = []
     for yr in years:
@@ -39,8 +57,8 @@ def load_wimbledon_odds(years):
             odds["odds_w"], odds["odds_l"], odds["odds_source"] = odds[wcol], odds[lcol], tag
             break
 
-    odds["_w"] = odds["Winner"].apply(normalise)
-    odds["_l"] = odds["Loser"].apply(normalise)
+    odds["_w"] = odds["Winner"].apply(canon_key)
+    odds["_l"] = odds["Loser"].apply(canon_key)
     odds["_year"] = pd.to_datetime(odds["Date"]).dt.year
     return odds[["_w", "_l", "_year", "odds_w", "odds_l"]].dropna(subset=["odds_w", "odds_l"])
 
@@ -75,7 +93,7 @@ def backtest(years):
     for _, m in matches.sort_values("date").iterrows():
         w, l, yr = m["_w"], m["_l"], m["_year"]
         if yr in years and m["_is_wimb"]:
-            key = (w, l, yr)
+            key = (canon_key(w), canon_key(l), yr)
             if key in odds_lookup.index:
                 row = running_stats.build_feature_vector(
                     w, l, m["winner_rank"], m["loser_rank"], m["date"], year=yr, medians=feature_medians

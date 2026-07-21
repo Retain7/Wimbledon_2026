@@ -232,6 +232,16 @@ def load_matches(matches_path):
 
 
 def build_training_rows(matches, player_stats):
+    """
+    Every match with valid ranks/date produces a training row (using
+    whatever stats each player has accumulated so far — grass-specific
+    features are NaN, later median-filled, if a player hasn't played
+    grass yet). Player_Stats itself only accumulates grass-specific
+    counters (grass_w/t, serve stats) on grass matches; non-grass
+    matches still update rank/form/top10 counters. Rows are tagged
+    is_wimb so callers can filter to a Wimbledon-only evaluation slice
+    without limiting what the model trains on.
+    """
     training_rows = []
     for midx, match in matches.iterrows():
         w = match["_w"]
@@ -245,11 +255,11 @@ def build_training_rows(matches, player_stats):
         wr = match["winner_rank"]
         lr = match["loser_rank"]
 
-        if is_grass and pd.notna(wr) and pd.notna(lr) and pd.notna(dt):
+        if pd.notna(wr) and pd.notna(lr) and pd.notna(dt):
             winner_row = player_stats.build_feature_vector(w, l, wr, lr, dt, year=yr)
             loser_row = player_stats.build_feature_vector(l, w, lr, wr, dt, year=yr)
-            winner_row.update({"match_id": midx, "label": 1})
-            loser_row.update({"match_id": midx, "label": 0})
+            winner_row.update({"match_id": midx, "label": 1, "is_wimb": is_wimb})
+            loser_row.update({"match_id": midx, "label": 0, "is_wimb": is_wimb})
             training_rows.append(winner_row)
             training_rows.append(loser_row)
 
@@ -287,7 +297,6 @@ def train_model(train_df):
 
     X = train_df[FEATURES]
     y = train_df["label"]
-    groups = train_df["match_id"]
 
     model = RandomForestClassifier(**RF_PARAMS)
     model.fit(X, y)
@@ -378,9 +387,11 @@ def main():
 
     model, feature_medians = train_model(train_df)
 
-    X = train_df[FEATURES]
-    y = train_df["label"]
-    groups = train_df["match_id"]
+    # Score only on Wimbledon rows; the model itself trained on all matches.
+    wimb_df = train_df[train_df["is_wimb"]]
+    X = wimb_df[FEATURES]
+    y = wimb_df["label"]
+    groups = wimb_df["match_id"]
     b_full, s_full, a_full = cv_brier(model, X, y, groups, FEATURES)
     print(f"  brier: {b_full:.4f} +/- {s_full:.4f}  acc={a_full:.3f}")
 
@@ -406,4 +417,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
