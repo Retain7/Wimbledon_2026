@@ -2,7 +2,7 @@
 
 This project predicts the winner of the 2026 Wimbledon gentlemen's singles draw with a random forest trained on ATP match data (2015–2026). These predictions are validated against both internal cross-validation and external devigged betting market odds. The tournament is simulated two ways: a pre-tournament Monte Carlo simulation (50,000 runs from the actual draw) in `wimbledon_rf.py`, and a live resimulation that shrinks the bracket to winners as actual results are announced, in `resimulate.py`.
 
-**Result:** 5-fold cross-validated Brier score of **0.1590 ± 0.0079** (accuracy 75.9%), evaluated on ___ Wimbledon matches, using a leakage-free feature pipeline and match-grouped CV.
+**Result:** 5-fold cross-validated Brier score of **0.1590 ± 0.0079** (accuracy 75.9%), evaluated on Wimbledon matches, using a leakage-free feature pipeline and match-grouped CV.
 
 ## Project structure
 
