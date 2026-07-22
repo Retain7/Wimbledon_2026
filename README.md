@@ -115,7 +115,7 @@ This matters more than the cross-validation testing because beating the market a
 
 Evaluated on 727 Wimbledon matches with odds coverage across the seven backtest years.
 
-The market wins, which is the expected and honest result — professional odds compilers have access to injury reports, practice-court observation, and same-day information no static feature set captures. The useful number here isn't "did I beat the market" but the size of the gap: 0.0464 in log-loss is close enough to suggest the model is picking up a real, if smaller, share of the same signal the market prices in, rather than being off by an order of magnitude. Whether that residual gap is close enough to justify looking for +EV spots (rather than the model just tracking the market with a lag) is exactly what a round-by-round or seed-tier breakdown, listed under Going Forward, would help establish.
+The market wins, which is the expected result. However, the optimistic part lies in the size of the gap, 0.0464, which the model is picking up a real share of the same signal the market prices in. Whether that residual gap is close enough to justify looking for +EV spots (rather than the model just tracking the market with a lag) is exactly what a round-by-round or seed-tier breakdown, listed under Going Forward, would help establish.
 
 ## Live tournament updating (`resimulate.py`)
 
